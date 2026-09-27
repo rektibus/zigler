@@ -171,7 +171,7 @@ defmodule Zig.Compiler do
 
     external_resources =
       parsed
-      |> recursive_resource_search(module.file, MapSet.new())
+      |> recursive_resource_search(module.file, MapSet.new([Path.join(__DIR__, "templates/build_mod.zig.eex")]))
       |> Enum.to_list()
 
     %{module | parsed: parsed, external_resources: external_resources}

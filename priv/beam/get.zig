@@ -736,7 +736,7 @@ fn null_or_atom(comptime T: type, src: beam.term, opts: anytype) !T {
     return GetError.badarg;
 }
 
-inline fn error_line(msg: anytype, opts: anytype) void {
+noinline fn error_line(msg: anytype, opts: anytype) void {
     // note that this function completely no-ops if the opts variable (which
     // in many cases is going to be `.{}`).  For the most part, this should be
     // used when detailed errors resulting from retrieving values from the VM
@@ -763,7 +763,7 @@ inline fn error_line(msg: anytype, opts: anytype) void {
     }
 }
 
-inline fn error_expected(comptime T: type, opts: anytype) void {
+noinline fn error_expected(comptime T: type, opts: anytype) void {
     // it's not entirely obvious why, but this needs to be put into a comptime block
     // to avoid a memory aliasing bug that exists in ziglang. (0.10.0)
     const typespec = comptime ts: {
@@ -777,11 +777,11 @@ inline fn error_expected(comptime T: type, opts: anytype) void {
     error_line(.{ "expected: ", typespec, " (for `", .{ .typename, typename }, "`)" }, opts);
 }
 
-inline fn error_got(src: beam.term, opts: anytype) void {
+noinline fn error_got(src: beam.term, opts: anytype) void {
     error_line(.{ "got: `", .{ .inspect, src }, "`" }, opts);
 }
 
-inline fn error_enter(msg: anytype, opts: anytype) void {
+noinline fn error_enter(msg: anytype, opts: anytype) void {
     error_line(.enter, opts);
     error_line(msg, opts);
 }

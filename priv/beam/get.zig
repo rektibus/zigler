@@ -736,34 +736,15 @@ fn null_or_atom(comptime T: type, src: beam.term, opts: anytype) !T {
     return GetError.badarg;
 }
 
-inline fn error_line(msg: anytype, opts: anytype) void {
-    // note that this function completely no-ops if the opts variable (which
-    // in many cases is going to be `.{}`).  For the most part, this should be
-    // used when detailed errors resulting from retrieving values from the VM
-    // needs to be passed back to the VM.
-
-    // in order to pass values back, .{} should contain the `.error_info` field
-    // and this field should be a pointer to a `beam.term` object.  Anything
-    // else will result in a compiler error.
-
+noinline fn error_line(msg: anytype, opts: anytype) void {
     if (!@hasField(@TypeOf(opts), "error_info")) return;
-
-    inline for (@typeInfo(@TypeOf(opts)).@"struct".fields) |field| {
-        if (std.mem.eql(u8, "error_info", field.name)) {
-            const field_type = @TypeOf(opts.error_info);
-            if (field_type != *beam.term) {
-                const error_msg = comptime mblk: {
-                    break :mblk std.fmt.comptimePrint("the `.error_info` field of the get opts parameter must be `*beam.term`, got: {any}", .{field_type});
-                };
-                @compileError(error_msg);
-            }
-
-            opts.error_info.v = e.enif_make_list_cell(options.env(opts), beam.make(msg, opts).v, opts.error_info.v);
-        }
-    }
+    if (@TypeOf(opts.error_info) != *beam.term)
+        @compileError("the `.error_info` field of the get opts parameter must be `*beam.term`, got: " ++ @typeName(@TypeOf(opts.error_info)));
+    const env = options.env(opts);
+    opts.error_info.v = e.enif_make_list_cell(env, beam.make(msg, .{ .env = env }).v, opts.error_info.v);
 }
 
-inline fn error_expected(comptime T: type, opts: anytype) void {
+noinline fn error_expected(comptime T: type, opts: anytype) void {
     // it's not entirely obvious why, but this needs to be put into a comptime block
     // to avoid a memory aliasing bug that exists in ziglang. (0.10.0)
     const typespec = comptime ts: {
@@ -777,11 +758,11 @@ inline fn error_expected(comptime T: type, opts: anytype) void {
     error_line(.{ "expected: ", typespec, " (for `", .{ .typename, typename }, "`)" }, opts);
 }
 
-inline fn error_got(src: beam.term, opts: anytype) void {
+noinline fn error_got(src: beam.term, opts: anytype) void {
     error_line(.{ "got: `", .{ .inspect, src }, "`" }, opts);
 }
 
-inline fn error_enter(msg: anytype, opts: anytype) void {
+noinline fn error_enter(msg: anytype, opts: anytype) void {
     error_line(.enter, opts);
     error_line(msg, opts);
 }

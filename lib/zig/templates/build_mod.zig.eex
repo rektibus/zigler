@@ -8,7 +8,7 @@ pub fn build(b: *std.Build) void {
     const error_tracing = <%= @error_tracing %>;
 
     const mode = b.option(BuildMode, "zigler-mode", "Build either the nif library or the sema analysis module") orelse .nif_lib;
-    const optimize: std.builtin.OptimizeMode = if (mode == .sema) .Debug else <%= render_optimize_mode(assigns) %>;
+    const optimize: std.builtin.OptimizeMode = if (mode == .sema) .Debug else b.standardOptimizeOption(.{});
 
     <%= for {name, _} <- @dependencies do %>
     const <%= name %> = b.dependency("<%= name %>", .{

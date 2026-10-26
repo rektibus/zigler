@@ -9,4 +9,5 @@
 
 <%= for dir <- @library_dirs do %>
 <%= name %>.addLibraryPath(.{.cwd_relative = "<%= dir %>"});
+<%= name %>.addRPath(.{.cwd_relative = "<%= dir %>"});
 <% end %>

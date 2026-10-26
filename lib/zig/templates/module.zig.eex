@@ -1,6 +1,7 @@
 const beam = @import("beam");
 const e = @import("erl_nif");
 const nif = @import("nif");
+pub const panic = if (@hasDecl(nif, "panic")) nif.panic else @import("std").debug.FullPanic(@import("std").debug.defaultPanic);
 const Allocator = @import("std").mem.Allocator;
 const Resource = beam.Resource;
 const root = @This();

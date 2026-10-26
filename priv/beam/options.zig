@@ -1,6 +1,8 @@
 /// common options utilities functions:
 const std = @import("std");
 const beam = @import("beam.zig");
+pub const GetOptions = struct { error_info: *beam.term };
+pub const MakeOptions = struct { env: beam.env };
 
 pub inline fn allocator(opts: anytype) std.mem.Allocator {
     return if (@hasField(@TypeOf(opts), "allocator")) opts.allocator else beam.context.allocator;

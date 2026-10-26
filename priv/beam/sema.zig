@@ -278,19 +278,21 @@ pub fn streamModule(stream: anytype, comptime Mod: type) !void {
     try stream.endObject();
 }
 
-pub fn main() !void {
-    // Zig 0.16: Get Io interface from Threaded implementation
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const stdout = std.Io.File.stdout();
-
-    // Create a writer - must keep the parent struct alive, then take pointer to .interface
-    var write_buffer: [65536]u8 = undefined;
-    var file_writer = stdout.writer(io, &write_buffer);
-    const writer = &file_writer.interface;
-
-    // Zig 0.16: json.WriteStream is now json.Stringify
-    var stream = json.Stringify{ .writer = writer, .options = .{ .whitespace = .indent_2 } };
-
+pub const panic = if (@hasDecl(nif, "panic")) nif.panic else std.debug.FullPanic(std.debug.defaultPanic);
+pub export fn main() callconv(.c) c_int {
+    emit() catch |err| std.debug.panic("Type inspection failed: {s}", .{@errorName(err)});
+    return 0;
+}
+fn emit() !void {
+    var output = std.Io.Writer.Allocating.init(std.heap.c_allocator);
+    defer output.deinit();
+    var stream = json.Stringify{ .writer = &output.writer, .options = .{ .whitespace = .indent_2 } };
     try streamModule(&stream, nif);
-    try writer.flush();
+    var pending = output.written();
+    while (pending.len != 0) {
+        const written = std.c.write(1, pending.ptr, pending.len);
+        if (written < 0 and std.c._errno().* == @intFromEnum(std.c.E.INTR)) continue;
+        if (written <= 0) return error.StdoutWrite;
+        pending = pending[@intCast(written)..];
+    }
 }

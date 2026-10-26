@@ -4,7 +4,8 @@ const std = @import("std");
 const resource = @import("resource.zig");
 const options = @import("options.zig");
 
-pub fn make(value: anytype, opts: anytype) beam.term {
+pub fn make(value: anytype, input_opts: anytype) beam.term {
+    const opts = if (comptime std.meta.fields(@TypeOf(input_opts)).len == @as(usize, @intFromBool(@hasField(@TypeOf(input_opts), "env"))) + @intFromBool(@hasField(@TypeOf(input_opts), "as")) and options.output(if (@hasField(@TypeOf(input_opts), "as")) .{ .as = input_opts.as } else .{}) == .default) options.MakeOptions{ .env = options.env(input_opts) } else input_opts;
     const T = @TypeOf(value);
 
     // passthrough on beam.term, no work needed.
@@ -242,7 +243,7 @@ fn make_enum(value: anytype, opts: anytype) beam.term {
     }
 }
 
-fn make_error(value: anytype, opts: anytype) beam.term {
+fn make_error(value: anyerror, opts: anytype) beam.term {
     options.assert_default(@TypeOf(value), opts);
     const tag_name = @errorName(value);
     return make_into_atom(tag_name, opts);

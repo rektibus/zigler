@@ -176,7 +176,7 @@ defmodule Zig.Command do
 
     target = precompile_name("-Dtarget=")
 
-    run_zig("build #{target} --prefix #{so_dir}",
+    run_zig("build #{target} -Doptimize=#{String.trim_leading(Zig.Module.render_optimize_mode(module), ".")} --prefix #{so_dir}",
       cd: staging_directory,
       stderr_to_stdout: true
     )

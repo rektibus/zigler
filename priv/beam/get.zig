@@ -8,7 +8,8 @@ const GetError = error{ badarg, unreachable_error };
 
 // get API function.
 
-pub fn get(comptime T: type, src: beam.term, opts: anytype) !T {
+pub fn get(comptime T: type, src: beam.term, input_opts: anytype) !T {
+    const opts = if (comptime @hasField(@TypeOf(input_opts), "error_info") and std.meta.fields(@TypeOf(input_opts)).len == 1) options.GetOptions{ .error_info = input_opts.error_info } else input_opts;
     // passthrough on beam.term and e.ErlNifTerm, no work needed.
 
     if (T == beam.term) return src;
@@ -131,7 +132,7 @@ inline fn genericGetInt(comptime T: type, src: beam.term, result_ptr: anytype, o
     }
 
     if (fun(options.env(opts), src.v, result_ptr) == 0) {
-        error_line(.{ "note: out of bounds (", .{ .inspect, minInt(T) }, "..", .{ .inspect, maxInt(T) }, ")" }, opts);
+        error_line(.{ @as([]const u8, "note: out of bounds ("), .{ .inspect, @as(if (@typeInfo(T).int.signedness == .signed) i64 else u64, minInt(T)) }, @as([]const u8, ".."), .{ .inspect, @as(if (@typeInfo(T).int.signedness == .signed) i64 else u64, maxInt(T)) }, @as([]const u8, ")") }, opts);
         return GetError.badarg;
     }
 }
@@ -139,7 +140,7 @@ inline fn genericGetInt(comptime T: type, src: beam.term, result_ptr: anytype, o
 inline fn lowerInt(comptime T: type, src: beam.term, result: anytype, opts: anytype) GetError!T {
     errdefer error_expected(T, opts);
     errdefer error_got(src, opts);
-    errdefer error_line(.{ "note: out of bounds (", .{ .inspect, minInt(T) }, "..", .{ .inspect, maxInt(T) }, ")" }, opts);
+    errdefer error_line(.{ @as([]const u8, "note: out of bounds ("), .{ .inspect, @as(if (@typeInfo(T).int.signedness == .signed) i64 else u64, minInt(T)) }, @as([]const u8, ".."), .{ .inspect, @as(if (@typeInfo(T).int.signedness == .signed) i64 else u64, maxInt(T)) }, @as([]const u8, ")") }, opts);
 
     const int = @typeInfo(T).int;
     if (int.signedness == .signed) {
@@ -170,14 +171,14 @@ pub fn get_enum(comptime T: type, src: beam.term, opts: anytype) !T {
     // prefer the integer form, fallback to string searches.
     switch (src.term_type(opts)) {
         .integer => {
-            errdefer error_line(.{ "note: not an integer value for ", .{ .typename, @typeName(T) }, " (should be one of `", .{ .inspect, int_values }, "`)" }, opts);
+            errdefer error_line(.{ @as([]const u8, "note: not an integer value for "), .{ .typename, @as([]const u8, @typeName(T)) }, @as([]const u8, " (should be one of `"), .{ .inspect, int_values }, @as([]const u8, "`)") }, opts);
 
             // put erasure on get_int setting the error_line
             const result = try get_int(IntType, src, opts);
             return @enumFromInt(result);
         },
         .atom => {
-            errdefer error_line(.{ "note: not an atom value for ", .{ .typename, @typeName(T) }, " (should be one of `", .{ .inspect, enum_values }, "`)" }, opts);
+            errdefer error_line(.{ @as([]const u8, "note: not an atom value for "), .{ .typename, @as([]const u8, @typeName(T)) }, @as([]const u8, " (should be one of `"), .{ .inspect, enum_values }, @as([]const u8, "`)") }, opts);
 
             // atoms cannot be longer than 256 characters.
             var buf: [256]u8 = undefined;
@@ -211,7 +212,7 @@ pub fn get_float(comptime T: type, src: beam.term, opts: anytype) !T {
         .atom => {
             // erase the errors coming back from get_enum!
             const special_form = get_enum(FloatAtoms, src, .{}) catch {
-                error_line(.{ "note: not an atom value for ", .{ .typename, @typeName(T) }, " (should be one of `[:infinity, :neg_infinity, :NaN]`" }, opts);
+                error_line(.{ @as([]const u8, "note: not an atom value for "), .{ .typename, @as([]const u8, @typeName(T)) }, @as([]const u8, " (should be one of `[:infinity, :neg_infinity, :NaN]`") }, opts);
                 return GetError.badarg;
             };
 
@@ -222,7 +223,7 @@ pub fn get_float(comptime T: type, src: beam.term, opts: anytype) !T {
             };
         },
         .integer => {
-            error_line(.{"note: integers are not allowed as arguments to float"}, opts);
+            error_line(.{@as([]const u8, "note: integers are not allowed as arguments to float")}, opts);
             return GetError.badarg;
         },
         else => {
@@ -266,7 +267,7 @@ pub fn get_resource(comptime T: type, src: beam.term, opts: anytype) !T {
 
     var res: T = undefined;
     res.get(src, opts) catch {
-        error_line(.{"note: the reference passed is not associated with a resource of the correct type"}, opts);
+        error_line(.{@as([]const u8, "note: the reference passed is not associated with a resource of the correct type")}, opts);
         return GetError.badarg;
     };
 
@@ -316,7 +317,7 @@ pub fn get_bool(comptime T: type, src: beam.term, opts: anytype) !T {
                 return false;
             }
 
-            error_line(.{"note: only the atoms `true` and `false` are allowed to be bools"}, opts);
+            error_line(.{@as([]const u8, "note: only the atoms `true` and `false` are allowed to be bools")}, opts);
         },
         else => {},
     }
@@ -400,8 +401,8 @@ pub fn get_slice_binary(comptime T: type, src: beam.term, opts: anytype) !T {
     if (e.enif_inspect_binary(options.env(opts), src.v, &str_res) == 0) return GetError.unreachable_error;
 
     if (str_res.size % expected_size_multiple != 0) {
-        error_line(.{ "got: ", .{ .inspect, str_res.size } }, opts);
-        error_line(.{ "note: binary size must be a multiple of ", .{ .inspect, expected_size_multiple } }, opts);
+        error_line(.{ @as([]const u8, "got: "), .{ .inspect, str_res.size } }, opts);
+        error_line(.{ @as([]const u8, "note: binary size must be a multiple of "), .{ .inspect, expected_size_multiple } }, opts);
         return GetError.badarg;
     }
 
@@ -451,7 +452,7 @@ pub fn get_slice_list(comptime T: type, src: beam.term, opts: anytype) !T {
         if (e.enif_get_list_cell(options.env(opts), list, &head, &list) == 0) return GetError.unreachable_error;
         item.* = get(Child, .{ .v = head }, opts) catch |err| {
             if (err == GetError.badarg) {
-                error_enter(.{ "at index ", .{ .inspect, index }, ":" }, opts);
+                error_enter(.{ @as([]const u8, "at index "), .{ .inspect, index }, @as([]const u8, ":") }, opts);
             }
             return err;
         };
@@ -566,19 +567,19 @@ fn fill_array(comptime T: type, result: *T, src: beam.term, opts: anytype) GetEr
                 if (e.enif_get_list_cell(options.env(opts), tail, &head, &tail) != 0) {
                     item.* = get(Child, .{ .v = head }, opts) catch |err| {
                         if (err == GetError.badarg) {
-                            error_enter(.{ "at index ", .{ .inspect, index }, ":" }, opts);
+                            error_enter(.{ @as([]const u8, "at index "), .{ .inspect, index }, @as([]const u8, ":") }, opts);
                         }
                         return err;
                     };
                 } else {
-                    error_line(.{ "note: length ", .{ .inspect, array_info.len }, " expected but got length ", .{ .inspect, index } }, opts);
+                    error_line(.{ @as([]const u8, "note: length "), .{ .inspect, @as(usize, array_info.len) }, @as([]const u8, " expected but got length "), .{ .inspect, index } }, opts);
                     return GetError.badarg;
                 }
             }
             if (e.enif_is_empty_list(options.env(opts), tail) == 0) {
                 var list_len: c_uint = undefined;
                 if (e.enif_get_list_length(options.env(opts), tail, &list_len) == 0) return GetError.unreachable_error;
-                error_line(.{ "note: length ", .{ .inspect, array_info.len }, " expected but got length ", .{ .inspect, list_len + array_info.len } }, opts);
+                error_line(.{ @as([]const u8, "note: length "), .{ .inspect, @as(usize, array_info.len) }, @as([]const u8, " expected but got length "), .{ .inspect, list_len + array_info.len } }, opts);
                 return GetError.badarg;
             }
         },
@@ -594,7 +595,7 @@ fn fill_array(comptime T: type, result: *T, src: beam.term, opts: anytype) GetEr
             if (e.enif_inspect_binary(options.env(opts), src.v, &str_res) == 0) return GetError.unreachable_error;
 
             if (str_res.size != expected_size) {
-                error_line(.{ "note: binary size ", .{ .inspect, expected_size }, " expected but got size ", .{ .inspect, str_res.size } }, opts);
+                error_line(.{ @as([]const u8, "note: binary size "), .{ .inspect, expected_size }, @as([]const u8, " expected but got size "), .{ .inspect, str_res.size } }, opts);
                 return GetError.badarg;
             }
 
@@ -617,7 +618,7 @@ fn fill_struct(comptime T: type, result: *T, src: beam.term, opts: anytype) !voi
                 if (e.enif_get_map_value(options.env(opts), src.v, field_atom.v, &map_value) == 1) {
                     @field(result.*, field.name) = get(F, .{ .v = map_value }, opts) catch |err| {
                         if (err == GetError.badarg) {
-                            error_enter(.{ "in field `:", field.name, "`:" }, opts);
+                            error_enter(.{ @as([]const u8, "in field `:"), field.name, @as([]const u8, "`:") }, opts);
                         }
                         return err;
                     };
@@ -632,7 +633,7 @@ fn fill_struct(comptime T: type, result: *T, src: beam.term, opts: anytype) !voi
                 }
 
                 if (failed) {
-                    error_line(.{ "note: ", .{ .typename, @typeName(T) }, " requires the field `:", field.name, "`, which is missing.)" }, opts);
+                    error_line(.{ @as([]const u8, "note: "), .{ .typename, @as([]const u8, @typeName(T)) }, @as([]const u8, " requires the field `:"), field.name, @as([]const u8, "`, which is missing.)") }, opts);
                     return GetError.badarg;
                 }
             }
@@ -657,7 +658,7 @@ fn fill_struct(comptime T: type, result: *T, src: beam.term, opts: anytype) !voi
                     if (std.mem.eql(u8, atom_name, field.name)) {
                         @field(result.*, field.name) = get(field.type, value, opts) catch |err| {
                             if (err == GetError.badarg) {
-                                error_enter(.{ "in field `:", field.name, "`:" }, opts);
+                                error_enter(.{ @as([]const u8, "in field `:"), field.name, @as([]const u8, "`:") }, opts);
                             }
                             return err;
                         };
@@ -675,7 +676,7 @@ fn fill_struct(comptime T: type, result: *T, src: beam.term, opts: anytype) !voi
                     if (field.default_value_ptr) |defaultptr| {
                         @field(result.*, field.name) = @as(*const Tf, @ptrCast(@alignCast(defaultptr))).*;
                     } else {
-                        error_line(.{ "note: ", .{ .typename, @typeName(T) }, " requires the field `:", field.name, "`, which is missing.)" }, opts);
+                        error_line(.{ @as([]const u8, "note: "), .{ .typename, @as([]const u8, @typeName(T)) }, @as([]const u8, " requires the field `:"), field.name, @as([]const u8, "`, which is missing.)") }, opts);
                         return GetError.badarg;
                     }
                 }
@@ -732,7 +733,7 @@ fn null_or_atom(comptime T: type, src: beam.term, opts: anytype) !T {
         else => {},
     }
 
-    error_line(.{ "note: ", .{ .typename, @typeName(T) }, " can take the atom `nil` but no other atom" }, opts);
+    error_line(.{ @as([]const u8, "note: "), .{ .typename, @as([]const u8, @typeName(T)) }, @as([]const u8, " can take the atom `nil` but no other atom") }, opts);
     return GetError.badarg;
 }
 
@@ -745,21 +746,11 @@ noinline fn error_line(msg: anytype, opts: anytype) void {
 }
 
 noinline fn error_expected(comptime T: type, opts: anytype) void {
-    // it's not entirely obvious why, but this needs to be put into a comptime block
-    // to avoid a memory aliasing bug that exists in ziglang. (0.10.0)
-    const typespec = comptime ts: {
-        break :ts typespec_for(T);
-    };
-
-    const typename = comptime tn: {
-        break :tn typename_for(T);
-    };
-
-    error_line(.{ "expected: ", typespec, " (for `", .{ .typename, typename }, "`)" }, opts);
+    error_line(.{ @as([]const u8, "expected: "), comptime typespec_for(T), @as([]const u8, " (for `"), .{ .typename, comptime typename_for(T) }, @as([]const u8, "`)") }, opts);
 }
 
 noinline fn error_got(src: beam.term, opts: anytype) void {
-    error_line(.{ "got: `", .{ .inspect, src }, "`" }, opts);
+    error_line(.{ @as([]const u8, "got: `"), .{ .inspect, src }, @as([]const u8, "`") }, opts);
 }
 
 noinline fn error_enter(msg: anytype, opts: anytype) void {

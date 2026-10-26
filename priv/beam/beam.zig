@@ -1935,8 +1935,8 @@ pub fn raise_elixir_exception(comptime module: []const u8, data: anytype, opts: 
 /// stacktrace.  In order to concatenate this stacktrace onto your BEAM
 /// exception, the function that wraps the nif must be able to catch the
 /// error and append the zig error return trace to the existing stacktrace.
-pub fn raise_with_error_return(err: anytype, maybe_return_trace: ?*std.builtin.StackTrace, opts: anytype) term {
-    if (@import("builtin").os.tag == .windows) return raise_exception(.{ .@"error", err, null }, opts);
+pub fn raise_with_error_return(err: anyerror, maybe_return_trace: ?*std.builtin.StackTrace, opts: anytype) term {
+    if (comptime !@import("builtin").have_error_return_tracing) return raise_exception(.{ .@"error", err, null }, opts);
 
     return if (maybe_return_trace) |return_trace|
         raise_exception(.{ .@"error", err, return_trace }, opts)

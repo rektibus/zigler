@@ -575,7 +575,7 @@ defmodule Zig.Module do
   end
 
   # EEX Helper functions
-  defp render_optimize_mode(build) do
+  def render_optimize_mode(build) do
     case build.optimize do
       :debug -> ".Debug"
       :safe -> ".ReleaseSafe"
@@ -592,7 +592,7 @@ defmodule Zig.Module do
     link_libs =
       Enum.map(c.link_lib, fn
         {:system, libname} ->
-          "#{mode}.linkSystemLibrary(\"#{libname}\");"
+          "#{mode}.root_module.linkSystemLibrary(\"#{libname}\", .{});"
 
         path ->
           "#{mode}.addObjectFile(.{.cwd_relative = \"#{path}\"});"
